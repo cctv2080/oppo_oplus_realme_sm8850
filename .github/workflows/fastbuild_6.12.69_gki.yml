@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       ksu_type:
-        description: 'KernelSU分支(BakaSU/SukiSU Ultra/KernelSU Next/KSU(原版)/无内置KSU,默认BakaSU)'
+        description: 'KernelSU分支(BakaSU/SukiSU Ultra/KernelSU Next/KSU(原版)/SukiSU-Nova/无内置KSU,默认BakaSU)'
         required: true
         type: choice
         default: 'bakasu'
@@ -21,6 +21,7 @@ on:
           - 'sukisu'
           - 'ksunext'
           - 'ksu'
+          - 'nova'
           - 'none'
       susfs_enable:
         description: '是否开启susfs(用于增强隐藏环境挂载功能; 可能轻微增加耗电，上游更新导致不稳定时或不需要可关闭)'
@@ -265,6 +266,18 @@ jobs:
             # 存储版本号到 GitHub 环境变量
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
+          elif [[ ${{ github.event.inputs.ksu_type }} == "nova" ]]; then
+            echo "正在配置 SukiSU-Nova..."
+            git clone https://github.com/SukiSU-Nova/SukiSU-Nova.git KernelSU
+            cd ./KernelSU
+            git checkout main
+            KSU_VERSION=$(expr $(git rev-list --count main) + 30996 2>/dev/null || echo 114514)
+            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+            echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
+            cd ..
+            ln -sf "$(realpath --relative-to=./common/drivers ./KernelSU/kernel)" ./common/drivers/kernelsu
+            grep -q "kernelsu" ./common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> ./common/drivers/Makefile
+            grep -q 'source "drivers/kernelsu/Kconfig"' ./common/drivers/Kconfig || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' ./common/drivers/Kconfig
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksunext" ]]; then
             echo "正在配置KernelSU Next..."
             curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
@@ -727,6 +740,8 @@ jobs:
             KSU_TYPENAME="SukiSU"
           elif [[ ${{ github.event.inputs.ksu_type }} == "bakasu" ]]; then
             KSU_TYPENAME="BakaSU"
+          elif [[ ${{ github.event.inputs.ksu_type }} == "nova" ]]; then
+            KSU_TYPENAME="Nova"
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksunext" ]]; then
             KSU_TYPENAME="KSUNext"
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksu" ]]; then
